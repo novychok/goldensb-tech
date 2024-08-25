@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  nats-server:
+    image: nats:latest
+    container_name: nats-container
+    command: ["--jetstream"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"

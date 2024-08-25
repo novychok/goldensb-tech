@@ -33,6 +33,7 @@ func (c *ConsumerApp) ServerConsumerApp() error {
 		}); err != nil {
 			c.l.Error("payload doesn't recieved", "err", err)
 		}
+
 	}()
 
 	c.l.Info("consumer app started")
