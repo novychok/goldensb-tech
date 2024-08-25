@@ -5,5 +5,5 @@ import (
 )
 
 type Producer interface {
-	Produce(ctx context.Context) error
+	Produce(ctx context.Context, notifyCh chan struct{}) error
 }

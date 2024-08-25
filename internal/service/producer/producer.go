@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"math/rand"
 
@@ -15,44 +16,59 @@ import (
 )
 
 type srv struct {
-	l          *slog.Logger
-	natsClient jetstream.JetStream
+	l               *slog.Logger
+	natsClient      jetstream.JetStream
+	realtimeService service.Realtime
 }
 
-func (s *srv) Produce(ctx context.Context) error {
+// Produce is infinit msg broadcast func, that have 2 cases:
+// default for publish a payload, and case to stop the broadcast with stopChan.
+func (s *srv) Produce(ctx context.Context, stopChan chan struct{}) error {
 
 	l := s.l.With(slog.String("method", "Produce"))
 
-	payloads, err := s.preparePayload()
-	if err != nil {
-		l.ErrorContext(ctx, "failed to prepare payloads", "err", err)
-		return err
-	}
-
-	wg := &sync.WaitGroup{}
-
-	for _, payload := range payloads {
-		wg.Add(1)
-		go func() {
-			payloadBytes, err := json.Marshal(payload)
-			if err != nil {
-				l.ErrorContext(ctx, "failed to marshal the payload", "err", err)
+	go func() {
+		for {
+			select {
+			case <-stopChan:
+				s.l.Info("interrupting the payload broadcast")
 				return
-			}
+			default:
+				time.Sleep(3 * time.Second)
 
-			_, err = s.natsClient.Publish(context.Background(), "payload.*", payloadBytes)
-			if err != nil {
-				l.ErrorContext(ctx, "failed to publish the payload", "err", err)
-				return
+				payloads, err := s.preparePayload()
+				if err != nil {
+					l.ErrorContext(ctx, "failed to prepare payloads", "err", err)
+					return
+				}
+
+				wg := &sync.WaitGroup{}
+				for _, payload := range payloads {
+					wg.Add(1)
+					go func() {
+						payloadBytes, err := json.Marshal(payload)
+						if err != nil {
+							l.ErrorContext(ctx, "failed to marshal the payload", "err", err)
+							return
+						}
+
+						_, err = s.natsClient.Publish(context.Background(), "payload.*", payloadBytes)
+						if err != nil {
+							l.ErrorContext(ctx, "failed to publish the payload", "err", err)
+							return
+						}
+						wg.Done()
+					}()
+				}
+				wg.Wait()
 			}
-			wg.Done()
-		}()
-	}
-	wg.Wait()
+		}
+	}()
 
 	return nil
 }
 
+// preparePayload is preparing concurrent Payloads slice.
 func (s *srv) preparePayload() ([]entity.Payload, error) {
 
 	numPayloads := rand.Intn(6) + 5
@@ -82,9 +98,11 @@ func (s *srv) preparePayload() ([]entity.Payload, error) {
 }
 
 func New(l *slog.Logger,
-	natsClient jetstream.JetStream) service.Producer {
+	natsClient jetstream.JetStream,
+	realtimeService service.Realtime) service.Producer {
 	return &srv{
-		l:          l,
-		natsClient: natsClient,
+		l:               l,
+		natsClient:      natsClient,
+		realtimeService: realtimeService,
 	}
 }

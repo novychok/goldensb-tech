@@ -23,8 +23,9 @@ func InitProducerApp() (*ProducerApp, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	serviceProducer := producer.New(logger, jetStream)
-	handler := producer2.New(serviceProducer)
+	serviceRealtime := realtime.New()
+	serviceProducer := producer.New(logger, jetStream, serviceRealtime)
+	handler := producer2.New(serviceProducer, serviceRealtime)
 	producerApp := NewProducerApp(logger, jetStream, handler)
 	return producerApp, func() {
 		cleanup()

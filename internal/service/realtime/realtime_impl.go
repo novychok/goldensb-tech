@@ -2,12 +2,14 @@ package realtime
 
 import (
 	"context"
+	"sync"
 
 	"github.com/novychok/goldensbtech/internal/service"
 )
 
 type srv struct {
 	broadcast chan string
+	wg        sync.WaitGroup
 }
 
 func (s *srv) PublishMessage(ctx context.Context, message string) error {
@@ -33,5 +35,6 @@ func (s *srv) SubscribeToMessages(ctx context.Context, handler func(message stri
 func New() service.Realtime {
 	return &srv{
 		broadcast: make(chan string),
+		wg:        sync.WaitGroup{},
 	}
 }

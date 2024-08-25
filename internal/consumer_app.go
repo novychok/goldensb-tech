@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -26,6 +25,8 @@ func (c *ConsumerApp) ServerConsumerApp() error {
 		c.l.Error("start nats stream failed", "err", err)
 	}
 
+	// SubscribeToMessages is a method that will inifinite listens to messages,
+	// and send them to callback function.
 	go func() {
 		if err := c.realtimeService.SubscribeToMessages(context.Background(), func(message string) error {
 			c.l.Info("get", slog.String("payload:", message))
@@ -38,15 +39,18 @@ func (c *ConsumerApp) ServerConsumerApp() error {
 
 	c.l.Info("consumer app started")
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
 
 	c.l.Info("\nclosing consumer app")
 
 	return nil
 }
 
+// Start is creating streams and consumers, on msg it will trigger the
+// nats handler, which is start to publish messages in realtime service broadcast channel,
+// and SubscribeToMessages will get the broadcasted messages.
 func (c *ConsumerApp) Start() error {
 
 	ctx := context.Background()
@@ -72,12 +76,12 @@ func (c *ConsumerApp) Start() error {
 		switch msg.Subject() {
 		case "payload.*":
 			if err := c.natsHandler.HandleMessagePub(ctx, msg.Data()); err != nil {
-				log.Printf("error to publish the message: %s", err)
+				c.l.Error("can't publish the message", "err", err)
 			}
 		}
 
 		if err := msg.Ack(); err != nil {
-			log.Printf("error to acknowledge the message: %s", err)
+			c.l.Error("can't acknowledge the message", "err", err)
 		}
 
 	})

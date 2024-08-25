@@ -22,6 +22,7 @@ func (p *ProducerApp) ServerProducerApp() error {
 	flag.Parse()
 
 	http.HandleFunc("GET /produce", p.producerHandler.SendMessages)
+	http.HandleFunc("GET /produce-stop", p.producerHandler.StopSendingMessages)
 
 	p.l.Info("producer app listening",
 		slog.Int("port", *port))
